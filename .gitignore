@@ -1,0 +1,53 @@
+# Spring Boot sensitive files
+Backend/src/main/resources/application.properties
+Backend/src/main/resources/application.yml
+
+
+# Compiled Java
+target/
+*.class
+*.jar
+*.war
+
+# Maven
+.mvn/
+mvnw
+mvnw.cmd
+
+# MySQL (if you have any local dump files)
+*.sql
+*.dump
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Converted/upload folders
+converted/
+uploads/
+temp/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Node (React frontend)
+node_modules/
+dist/
+build/
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Logs
+logs/
+*.log
+npm-debug.log*
