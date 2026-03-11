@@ -1,10 +1,9 @@
 services:
   - type: web
     name: doccraft-backend
-    env: java
+    env: docker
     rootDir: Backend
-    buildCommand: mvn clean install -DskipTests
-    startCommand: java -jar target/*.jar
+    dockerfilePath: ./Dockerfile
     envVars:
       - key: SPRING_DATASOURCE_URL
         value: jdbc:mysql://sql12.freesqldatabase.com:3306/sql12819570
