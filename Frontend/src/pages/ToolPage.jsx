@@ -355,6 +355,7 @@ export default function ToolPage() {
                       {toolId === "split-pdf"   && <SplitOptions   opts={opts} setOpts={setOpts} />}
                       {toolId === "rotate-pdf"  && <RotateOptions  opts={opts} setOpts={setOpts} />}
                       {toolId === "protect-pdf" && <ProtectOptions opts={opts} setOpts={setOpts} />}
+                      {toolId === "unlock-pdf"  && <UnlockOptions  opts={opts} setOpts={setOpts} />}
                     </div>
                   )}
 
@@ -368,6 +369,7 @@ export default function ToolPage() {
                       {toolId === "protect-pdf" ? "🔒 Protect PDF →" :
                        toolId === "rotate-pdf"  ? "🔄 Rotate PDF →" :
                        toolId === "split-pdf"   ? "✂️ Split PDF →" :
+                       toolId === "unlock-pdf"  ? "🔓 Unlock PDF →" :
                        `Convert to ${tool.to} →`}
                     </button>
                   )}
