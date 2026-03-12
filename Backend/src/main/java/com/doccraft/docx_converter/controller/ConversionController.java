@@ -108,4 +108,64 @@ public class ConversionController {
                         "attachment; filename=\"" + filename + "\"")
                 .body(resource);
     }
+
+      // Splits every page into its own PDF and returns a ZIP file.
+    @PostMapping("/split-pdf")
+    public ResponseEntity<Resource> splitPdf(
+            @RequestParam("file") MultipartFile file,
+            @AuthenticationPrincipal User user,
+            HttpServletRequest req) throws Exception {
+ 
+        Path output = conversionService.splitPdf(file, user, req.getRemoteAddr());
+        return buildFileResponse(output, "split_pages.zip", "application/zip");
+    }
+ 
+    // ── POST /api/convert/split-pdf-range ─────────────────────────────────────
+    // Splits a specific page range and returns a single PDF.
+    // Body params: startPage (int), endPage (int)
+    @PostMapping("/split-pdf-range")
+    public ResponseEntity<Resource> splitPdfByRange(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("startPage") int startPage,
+            @RequestParam("endPage") int endPage,
+            @AuthenticationPrincipal User user,
+            HttpServletRequest req) throws Exception {
+ 
+        Path output = conversionService.splitPdfByRange(file, startPage, endPage, user, req.getRemoteAddr());
+        return buildFileResponse(output, "split.pdf", MediaType.APPLICATION_PDF_VALUE);
+    }
+ 
+    // ── POST /api/convert/rotate-pdf ─────────────────────────────────────────
+    // Rotates pages of a PDF.
+    // Body params:
+    //   degrees   : 90 | 180 | 270
+    //   pageTarget: "all"  OR  comma-separated 1-indexed page numbers e.g. "1,3,5"
+    @PostMapping("/rotate-pdf")
+    public ResponseEntity<Resource> rotatePdf(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "degrees", defaultValue = "90") int degrees,
+            @RequestParam(value = "pageTarget", defaultValue = "all") String pageTarget,
+            @AuthenticationPrincipal User user,
+            HttpServletRequest req) throws Exception {
+ 
+        Path output = conversionService.rotatePdf(file, degrees, pageTarget, user, req.getRemoteAddr());
+        return buildFileResponse(output, "rotated.pdf", MediaType.APPLICATION_PDF_VALUE);
+    }
+ 
+    // ── POST /api/convert/protect-pdf ────────────────────────────────────────
+    // Password-protects a PDF.
+    // Body params:
+    //   userPassword  : password required to open the file (required)
+    //   ownerPassword : password required to change permissions (optional)
+    @PostMapping("/protect-pdf")
+    public ResponseEntity<Resource> protectPdf(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("userPassword") String userPassword,
+            @RequestParam(value = "ownerPassword", defaultValue = "") String ownerPassword,
+            @AuthenticationPrincipal User user,
+            HttpServletRequest req) throws Exception {
+ 
+        Path output = conversionService.passwordProtectPdf(file, userPassword, ownerPassword, user, req.getRemoteAddr());
+        return buildFileResponse(output, "protected.pdf", MediaType.APPLICATION_PDF_VALUE);
+    }
 }

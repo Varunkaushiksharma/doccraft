@@ -9,6 +9,8 @@ import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.encryption.AccessPermission;
+import org.apache.pdfbox.pdmodel.encryption.StandardProtectionPolicy;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.apache.pdfbox.rendering.ImageType;
@@ -20,6 +22,9 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.apache.pdfbox.Loader;
+
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -311,4 +316,163 @@ public class ConversionService {
             }
         }
     }
+     // ── Split PDF ─────────────────────────────────────────────────────────────
+    // Splits each page into a separate PDF, zips them all, returns the zip.
+    // Frontend can also pass startPage/endPage for range-based split (see overload below).
+    public Path splitPdf(MultipartFile file, User user, String ip) throws IOException {
+        ensureDirs();
+        Path inputPath = saveUpload(file);
+        String outFilename = UUID.randomUUID() + "_split.zip";
+        Path outputPath = Paths.get(outputDir, outFilename);
+ 
+        try (PDDocument pdf = Loader.loadPDF(inputPath.toFile());
+             FileOutputStream fos = new FileOutputStream(outputPath.toFile());
+             ZipOutputStream zos = new ZipOutputStream(fos)) {
+ 
+            int totalPages = pdf.getNumberOfPages();
+            log.info("Splitting PDF with {} pages", totalPages);
+ 
+            for (int i = 0; i < totalPages; i++) {
+                try (PDDocument singlePage = new PDDocument()) {
+                    singlePage.addPage(pdf.getPage(i));
+ 
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                    singlePage.save(baos);
+ 
+                    ZipEntry entry = new ZipEntry("page_" + (i + 1) + ".pdf");
+                    zos.putNextEntry(entry);
+                    zos.write(baos.toByteArray());
+                    zos.closeEntry();
+                }
+            }
+        }
+ 
+        saveRecord(file, outFilename, "PDF", "ZIP", "split-pdf", outputPath, user, ip, ConversionRecord.Status.SUCCESS);
+        return outputPath;
+    }
+ 
+    // ── Split PDF by Range ────────────────────────────────────────────────────
+    // e.g. startPage=1, endPage=3 → returns a single PDF with only those pages
+    public Path splitPdfByRange(MultipartFile file, int startPage, int endPage, User user, String ip) throws IOException {
+        ensureDirs();
+        Path inputPath = saveUpload(file);
+        String outFilename = UUID.randomUUID() + "_split.pdf";
+        Path outputPath = Paths.get(outputDir, outFilename);
+ 
+        try (PDDocument pdf = Loader.loadPDF(inputPath.toFile());
+             PDDocument result = new PDDocument()) {
+ 
+            int totalPages = pdf.getNumberOfPages();
+ 
+            // Clamp to valid range (pages are 1-indexed from user, 0-indexed in PDFBox)
+            int start = Math.max(1, startPage);
+            int end   = Math.min(endPage, totalPages);
+ 
+            if (start > end) {
+                throw new IllegalArgumentException(
+                    "Invalid page range: startPage=" + startPage + " endPage=" + endPage +
+                    " (document has " + totalPages + " pages)"
+                );
+            }
+ 
+            log.info("Splitting PDF pages {} to {} (total pages: {})", start, end, totalPages);
+ 
+            for (int i = start - 1; i < end; i++) {
+                result.addPage(pdf.getPage(i));
+            }
+ 
+            result.save(outputPath.toFile());
+        }
+ 
+        saveRecord(file, outFilename, "PDF", "PDF", "split-pdf", outputPath, user, ip, ConversionRecord.Status.SUCCESS);
+        return outputPath;
+    }
+ 
+    // ── Rotate PDF Pages ──────────────────────────────────────────────────────
+    // degrees: 90, 180, 270
+    // pageTarget: "all" → rotate every page; "1,3,5" → rotate specific pages (1-indexed)
+    public Path rotatePdf(MultipartFile file, int degrees, String pageTarget, User user, String ip) throws IOException {
+        ensureDirs();
+        Path inputPath = saveUpload(file);
+        String outFilename = UUID.randomUUID() + "_rotated.pdf";
+        Path outputPath = Paths.get(outputDir, outFilename);
+ 
+        // Normalise degrees to 0/90/180/270
+        int normalised = ((degrees % 360) + 360) % 360;
+        if (normalised != 90 && normalised != 180 && normalised != 270) {
+            throw new IllegalArgumentException("Rotation must be 90, 180, or 270 degrees. Got: " + degrees);
+        }
+ 
+        try (PDDocument pdf = Loader.loadPDF(inputPath.toFile())) {
+            int totalPages = pdf.getNumberOfPages();
+ 
+            if ("all".equalsIgnoreCase(pageTarget) || pageTarget == null || pageTarget.isBlank()) {
+                // Rotate all pages
+                log.info("Rotating all {} pages by {} degrees", totalPages, normalised);
+                for (int i = 0; i < totalPages; i++) {
+                    PDPage page = pdf.getPage(i);
+                    page.setRotation((page.getRotation() + normalised) % 360);
+                }
+            } else {
+                // Rotate specific pages e.g. "1,3,5"
+                String[] parts = pageTarget.split(",");
+                log.info("Rotating specific pages [{}] by {} degrees", pageTarget, normalised);
+                for (String part : parts) {
+                    int pageNum = Integer.parseInt(part.trim());
+                    if (pageNum < 1 || pageNum > totalPages) {
+                        log.warn("Page {} out of range (document has {} pages), skipping", pageNum, totalPages);
+                        continue;
+                    }
+                    PDPage page = pdf.getPage(pageNum - 1); // Convert to 0-indexed
+                    page.setRotation((page.getRotation() + normalised) % 360);
+                }
+            }
+ 
+            pdf.save(outputPath.toFile());
+        }
+ 
+        saveRecord(file, outFilename, "PDF", "PDF", "rotate-pdf", outputPath, user, ip, ConversionRecord.Status.SUCCESS);
+        return outputPath;
+    }
+ 
+    // ── Password Protect PDF ──────────────────────────────────────────────────
+    // userPassword   → password required to OPEN the document
+    // ownerPassword  → password required to change permissions (use strong value)
+    // If ownerPassword is blank, defaults to a random UUID (user can't change permissions without it)
+    public Path passwordProtectPdf(MultipartFile file, String userPassword, String ownerPassword, User user, String ip) throws IOException {
+        ensureDirs();
+        Path inputPath = saveUpload(file);
+        String outFilename = UUID.randomUUID() + "_protected.pdf";
+        Path outputPath = Paths.get(outputDir, outFilename);
+ 
+        if (userPassword == null || userPassword.isBlank()) {
+            throw new IllegalArgumentException("User password must not be empty");
+        }
+ 
+        // Use random owner password if not provided — prevents users from easily removing protection
+        String ownerPass = (ownerPassword == null || ownerPassword.isBlank())
+                ? UUID.randomUUID().toString()
+                : ownerPassword;
+ 
+        try (PDDocument pdf = Loader.loadPDF(inputPath.toFile())) {
+            // Define what the user (with userPassword) is allowed to do
+            AccessPermission ap = new AccessPermission();
+            ap.setCanPrint(true);                // Allow printing
+            ap.setCanExtractContent(false);      // Disallow text extraction
+            ap.setCanModify(false);              // Disallow editing
+            ap.setCanFillInForm(true);           // Allow form filling
+ 
+            StandardProtectionPolicy policy = new StandardProtectionPolicy(ownerPass, userPassword, ap);
+            policy.setEncryptionKeyLength(128);  // AES-128 (compatible + secure)
+ 
+            pdf.protect(policy);
+            pdf.save(outputPath.toFile());
+ 
+            log.info("Password protected PDF saved: {}", outFilename);
+        }
+ 
+        saveRecord(file, outFilename, "PDF", "PDF", "protect-pdf", outputPath, user, ip, ConversionRecord.Status.SUCCESS);
+        return outputPath;
+    }
+ 
 }
