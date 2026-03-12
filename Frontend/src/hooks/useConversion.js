@@ -3,8 +3,8 @@ import { convertFile, downloadBlob } from "../services/api";
 
 export function useConversion(tool) {
   const [files, setFiles] = useState([]);
-  const [progress, setProgress] = useState(null); // { phase, percent }
-  const [status, setStatus] = useState("idle"); // idle | uploading | converting | done | error
+  const [progress, setProgress] = useState(null);
+  const [status, setStatus] = useState("idle");
   const [error, setError] = useState(null);
   const [resultFilename, setResultFilename] = useState(null);
 
@@ -30,14 +30,18 @@ export function useConversion(tool) {
     setResultFilename(null);
   }, []);
 
-  const convert = useCallback(async (options = {}) => {
+  // endpointOverride — allows using a different endpoint than tool.id
+  // e.g. "split-pdf-range" instead of "split-pdf"
+  const convert = useCallback(async (options = {}, endpointOverride = null) => {
     if (!files.length) return;
     setError(null);
     setStatus("uploading");
 
+    const endpoint = endpointOverride || tool.id;
+
     try {
       const response = await convertFile(
-        tool.id,
+        endpoint,
         tool.multi ? files : files[0],
         options,
         (prog) => {
@@ -46,7 +50,6 @@ export function useConversion(tool) {
         }
       );
 
-      // Extract filename from content-disposition header
       const disposition = response.headers["content-disposition"];
       const match = disposition?.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
       const filename = match
@@ -56,13 +59,11 @@ export function useConversion(tool) {
       setResultFilename(filename);
       setStatus("done");
 
-      // Auto-download
       downloadBlob(response.data, filename);
     } catch (err) {
       setStatus("error");
       setError(
-        err.response?.data?.message ||
-          "Conversion failed. Please try again."
+        err.response?.data?.message || "Conversion failed. Please try again."
       );
     }
   }, [files, tool]);
