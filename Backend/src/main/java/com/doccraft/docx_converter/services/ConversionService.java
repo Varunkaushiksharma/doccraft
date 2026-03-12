@@ -16,12 +16,18 @@ import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.apache.pdfbox.rendering.ImageType;
 import org.apache.pdfbox.rendering.PDFRenderer;
 import org.apache.pdfbox.text.PDFTextStripper;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.poi.xwpf.usermodel.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.apache.pdfbox.Loader;
+import org.apache.poi.ss.usermodel.*;
+
 
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -472,6 +478,110 @@ public class ConversionService {
         }
  
         saveRecord(file, outFilename, "PDF", "PDF", "protect-pdf", outputPath, user, ip, ConversionRecord.Status.SUCCESS);
+        return outputPath;
+    }
+
+     // ── PDF → Excel ───────────────────────────────────────────────────────────
+    // Extracts text from each page, splits by whitespace into cells,
+    // and writes each page as a separate sheet in the workbook.
+    public Path convertPdfToExcel(MultipartFile file, User user, String ip) throws IOException {
+        ensureDirs();
+        Path inputPath = saveUpload(file);
+        String outFilename = UUID.randomUUID() + ".xlsx";
+        Path outputPath = Paths.get(outputDir, outFilename);
+ 
+        try (PDDocument pdf = Loader.loadPDF(inputPath.toFile());
+             Workbook workbook = new XSSFWorkbook()) {
+ 
+            PDFTextStripper stripper = new PDFTextStripper();
+            int totalPages = pdf.getNumberOfPages();
+            log.info("Converting PDF with {} pages to Excel", totalPages);
+ 
+            for (int i = 1; i <= totalPages; i++) {
+                stripper.setStartPage(i);
+                stripper.setEndPage(i);
+                String pageText = stripper.getText(pdf);
+ 
+                // Create a sheet per page
+                Sheet sheet = workbook.createSheet("Page " + i);
+ 
+                String[] lines = pageText.split("\n");
+                for (int rowIdx = 0; rowIdx < lines.length; rowIdx++) {
+                    String line = lines[rowIdx].trim();
+                    if (line.isEmpty()) continue;
+ 
+                    Row row = sheet.createRow(rowIdx);
+ 
+                    // Split line by 2+ spaces or tabs — common PDF table delimiter
+                    String[] cells = line.split("\\s{2,}|\t");
+                    for (int colIdx = 0; colIdx < cells.length; colIdx++) {
+                        Cell cell = row.createCell(colIdx);
+                        String val = cells[colIdx].trim();
+ 
+                        // Try to parse as number for proper Excel formatting
+                        try {
+                            double num = Double.parseDouble(val.replaceAll(",", ""));
+                            cell.setCellValue(num);
+                        } catch (NumberFormatException e) {
+                            cell.setCellValue(val);
+                        }
+                    }
+                }
+ 
+                // Auto-size first 10 columns for readability
+                for (int col = 0; col < 10; col++) {
+                    sheet.autoSizeColumn(col);
+                }
+            }
+ 
+            try (FileOutputStream fos = new FileOutputStream(outputPath.toFile())) {
+                workbook.write(fos);
+            }
+        }
+ 
+        saveRecord(file, outFilename, "PDF", "XLSX", "pdf-to-excel", outputPath, user, ip, ConversionRecord.Status.SUCCESS);
+        return outputPath;
+    }
+ 
+    // ── Unlock PDF ────────────────────────────────────────────────────────────
+    // Removes password protection from a PDF.
+    // Requires the correct password to open the document first.
+    // If no password provided, tries empty string (some PDFs have empty owner password).
+    public Path unlockPdf(MultipartFile file, String password, User user, String ip) throws IOException {
+        ensureDirs();
+        Path inputPath = saveUpload(file);
+        String outFilename = UUID.randomUUID() + "_unlocked.pdf";
+        Path outputPath = Paths.get(outputDir, outFilename);
+ 
+        // Try with provided password, then empty string as fallback
+        PDDocument pdf = null;
+        try {
+            String pass = (password != null) ? password : "";
+            try {
+                pdf = Loader.loadPDF(inputPath.toFile(), pass);
+            } catch (org.apache.pdfbox.pdmodel.encryption.InvalidPasswordException e) {
+                // If provided password fails, try empty password
+                if (!pass.isEmpty()) {
+                    pdf = Loader.loadPDF(inputPath.toFile(), "");
+                } else {
+                    throw new IllegalArgumentException("Incorrect password. Please provide the correct PDF password.");
+                }
+            }
+ 
+            if (pdf.isEncrypted()) {
+                pdf.setAllSecurityToBeRemoved(true);
+            }
+ 
+            pdf.save(outputPath.toFile());
+            log.info("PDF unlocked successfully: {}", outFilename);
+ 
+        } finally {
+            if (pdf != null) {
+                try { pdf.close(); } catch (IOException ignored) {}
+            }
+        }
+ 
+        saveRecord(file, outFilename, "PDF", "PDF", "unlock-pdf", outputPath, user, ip, ConversionRecord.Status.SUCCESS);
         return outputPath;
     }
  

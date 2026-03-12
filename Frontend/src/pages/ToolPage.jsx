@@ -166,11 +166,44 @@ function ProtectOptions({ opts, setOpts }) {
   );
 }
 
+ 
+function UnlockOptions({ opts, setOpts }) {
+  const [showPass, setShowPass] = useState(false);
+  return (
+    <div style={optStyles.panel}>
+      <div style={optStyles.inputGroup}>
+        <label style={optStyles.inputLabel}>🔑 Current Password (if known)</label>
+        <div style={{ position: "relative" }}>
+          <input
+            type={showPass ? "text" : "password"}
+            value={opts.password}
+            onChange={(e) => setOpts((p) => ({ ...p, password: e.target.value }))}
+            style={{ ...optStyles.input, paddingRight: 48 }}
+            placeholder="Leave blank to try without password"
+          />
+          <button
+            onClick={() => setShowPass((v) => !v)}
+            style={optStyles.eyeBtn}
+            title={showPass ? "Hide" : "Show"}
+          >
+            {showPass ? "🙈" : "👁️"}
+          </button>
+        </div>
+      </div>
+      <p style={optStyles.hint}>
+        If the PDF has an <strong style={{ color: "#F0EDE6" }}>owner password</strong> only (not a user password),
+        we can remove it automatically without a password.
+      </p>
+    </div>
+  );
+}
+
 // ── Option default state per tool ──────────────────────────────────────────
 const defaultOpts = {
   "split-pdf":   { mode: "all-pages", startPage: "1", endPage: "" },
   "rotate-pdf":  { degrees: "90", pageMode: "all", pageTarget: "" },
   "protect-pdf": { userPassword: "", ownerPassword: "" },
+  "unlock-pdf":  { password: "" },   // ← ADD THIS LINE
 };
 
 // Build the options object to send to the backend
@@ -194,6 +227,9 @@ function buildApiOptions(toolId, opts) {
       userPassword: opts.userPassword,
       ownerPassword: opts.ownerPassword || "",
     };
+  }
+  if (toolId === "unlock-pdf") {
+    return { password: opts.password || "" };  // ← ADD THIS BLOCK
   }
   return {};
 }

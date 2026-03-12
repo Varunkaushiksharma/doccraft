@@ -168,4 +168,30 @@ public class ConversionController {
         Path output = conversionService.passwordProtectPdf(file, userPassword, ownerPassword, user, req.getRemoteAddr());
         return buildFileResponse(output, "protected.pdf", MediaType.APPLICATION_PDF_VALUE);
     }
+
+      // ── POST /api/convert/pdf-to-excel ────────────────────────────────────────
+    @PostMapping("/pdf-to-excel")
+    public ResponseEntity<Resource> pdfToExcel(
+            @RequestParam("file") MultipartFile file,
+            @AuthenticationPrincipal User user,
+            HttpServletRequest req) throws Exception {
+ 
+        Path output = conversionService.convertPdfToExcel(file, user, req.getRemoteAddr());
+        return buildFileResponse(output, "converted.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    }
+ 
+    // ── POST /api/convert/unlock-pdf ──────────────────────────────────────────
+    // Body params:
+    //   password: the current PDF password (optional — tries empty string if blank)
+    @PostMapping("/unlock-pdf")
+    public ResponseEntity<Resource> unlockPdf(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "password", defaultValue = "") String password,
+            @AuthenticationPrincipal User user,
+            HttpServletRequest req) throws Exception {
+ 
+        Path output = conversionService.unlockPdf(file, password, user, req.getRemoteAddr());
+        return buildFileResponse(output, "unlocked.pdf", MediaType.APPLICATION_PDF_VALUE);
+    }
 }

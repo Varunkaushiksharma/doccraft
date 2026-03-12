@@ -125,18 +125,6 @@ export const TOOLS = [
     category: "organize",
   },
   {
-    id: "watermark-pdf",
-    icon: "💧",
-    iconTo: "📄",
-    label: "Watermark PDF",
-    desc: "Add text or image watermarks to your PDF",
-    from: "PDF",
-    to: "PDF",
-    accept: ".pdf",
-    color: "#4F8EF7",
-    category: "edit",
-  },
-  {
     id: "protect-pdf",
     icon: "🔒",
     iconTo: "📄",
@@ -167,6 +155,5 @@ export const CATEGORIES = [
   { id: "convert", label: "Convert" },
   { id: "organize", label: "Organize" },
   { id: "optimize", label: "Optimize" },
-  { id: "edit", label: "Edit" },
   { id: "security", label: "Security" },
 ];
