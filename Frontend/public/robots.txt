@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://doccraft-liart.vercel.app/sitemap.xml
