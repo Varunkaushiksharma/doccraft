@@ -1,8 +1,16 @@
+// src/pages/HistoryPage.jsx  — responsive version
+// Changes vs original:
+//   • container padding: 48px 40px → 24px 16px on mobile
+//   • mainLayout: stacks vertically on mobile, sidebar hidden on mobile
+//   • record-row: wraps on mobile, filename truncation preserved
+//   • format badge stacks better on small screens
+
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { historyAPI } from "../services/api";
 import AdBanner from "../components/AdBanner";
+import { useBreakpoint } from "../hooks/useBreakpoint";
 
 const STATUS_COLORS = {
   SUCCESS: { bg: "#0e1a12", border: "#1f3627", color: "#5BBF7A" },
@@ -13,6 +21,7 @@ const STATUS_COLORS = {
 export default function HistoryPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const isMobile = useBreakpoint(768);
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
@@ -49,12 +58,10 @@ export default function HistoryPage() {
     }
   };
 
-  const formatDate = (iso) => {
-    return new Date(iso).toLocaleString("en-IN", {
-      day: "numeric", month: "short", year: "numeric",
-      hour: "2-digit", minute: "2-digit",
-    });
-  };
+  const formatDate = (iso) => new Date(iso).toLocaleString("en-IN", {
+    day: "numeric", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
 
   return (
     <div style={{ background: "#0D0D0F", minHeight: "100vh" }}>
@@ -71,26 +78,23 @@ export default function HistoryPage() {
         .page-btn.active { background: #F0EDE6; color: #0D0D0F; border-color: #F0EDE6; font-weight: 700; }
       `}</style>
 
-      <div style={styles.container} className="fade-up">
+      <div style={{ ...styles.container, padding: isMobile ? "24px 16px 60px" : "48px 40px 80px" }} className="fade-up">
 
-        {/* ── Top Ad Banner ─────────────────────────────────────── */}
         <div style={{ marginBottom: 32 }}>
           <AdBanner slot="1111111111" format="horizontal" />
         </div>
 
-        {/* ── Header ────────────────────────────────────────────── */}
-        <div style={styles.header}>
+        <div style={{ ...styles.header, flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "flex-start" : "flex-start" }}>
           <div>
-            <h1 style={styles.title}>Conversion History</h1>
+            <h1 style={{ ...styles.title, fontSize: isMobile ? 24 : 32 }}>Conversion History</h1>
             <p style={styles.sub}>All your past conversions in one place.</p>
           </div>
           <Link to="/tools" style={styles.btnPrimary}>+ New Conversion</Link>
         </div>
 
-        {/* ── Main layout: records + sidebar ad ─────────────────── */}
-        <div style={styles.mainLayout}>
+        {/* Main layout — stacks on mobile */}
+        <div style={{ ...styles.mainLayout, flexDirection: isMobile ? "column" : "row" }}>
 
-          {/* ── Records list ──────────────────────────────────────── */}
           <div style={{ flex: 1, minWidth: 0 }}>
             {loading ? (
               <div style={styles.emptyBox}>
@@ -102,53 +106,36 @@ export default function HistoryPage() {
                 <div style={{ fontSize: 48, marginBottom: 16 }}>📭</div>
                 <p style={styles.emptyTitle}>No conversions yet</p>
                 <p style={styles.emptyText}>Your conversion history will appear here.</p>
-                <Link to="/tools" style={{ ...styles.btnPrimary, marginTop: 20, display: "inline-block" }}>
-                  Start Converting
-                </Link>
+                <Link to="/tools" style={{ ...styles.btnPrimary, marginTop: 20, display: "inline-block" }}>Start Converting</Link>
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {records.map((r, i) => {
+                {records.map((r) => {
                   const sc = STATUS_COLORS[r.status] || STATUS_COLORS.PENDING;
                   return (
                     <div key={r.id} className="record-row">
-                      <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-
-                        {/* Format badge */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                         <div style={styles.formatBadge}>
                           <span style={{ color: "#888", fontSize: 13 }}>{r.fromFormat}</span>
                           <span style={{ color: "#333", fontSize: 12 }}>→</span>
                           <span style={{ color: "#4F8EF7", fontSize: 13, fontWeight: 700 }}>{r.toFormat}</span>
                         </div>
-
-                        {/* File info */}
-                        <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ flex: 1, minWidth: isMobile ? "100%" : 0 }}>
                           <p style={styles.filename}>{r.originalFilename}</p>
-                          <p style={styles.meta}>
-                            {r.fileSizeKb} KB · {formatDate(r.createdAt)}
-                          </p>
+                          <p style={styles.meta}>{r.fileSizeKb} KB · {formatDate(r.createdAt)}</p>
                         </div>
-
-                        {/* Status */}
-                        <div style={{ ...styles.statusBadge, background: sc.bg, border: `1px solid ${sc.border}`, color: sc.color }}>
-                          {r.status}
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div style={{ ...styles.statusBadge, background: sc.bg, border: `1px solid ${sc.border}`, color: sc.color }}>
+                            {r.status}
+                          </div>
+                          <button className="del-btn" onClick={() => handleDelete(r.id)} disabled={deleting === r.id} style={styles.delBtn}>
+                            {deleting === r.id ? "…" : "✕"}
+                          </button>
                         </div>
-
-                        {/* Delete */}
-                        <button
-                          className="del-btn"
-                          onClick={() => handleDelete(r.id)}
-                          disabled={deleting === r.id}
-                          style={styles.delBtn}
-                        >
-                          {deleting === r.id ? "…" : "✕"}
-                        </button>
                       </div>
                     </div>
                   );
                 })}
-
-                {/* ── Mid-list Ad (after every 5 records) ─────────── */}
                 {records.length >= 5 && (
                   <div style={{ margin: "8px 0" }}>
                     <AdBanner slot="2222222222" format="horizontal" />
@@ -157,178 +144,52 @@ export default function HistoryPage() {
               </div>
             )}
 
-            {/* ── Pagination ──────────────────────────────────────── */}
             {totalPages > 1 && (
               <div style={styles.pagination}>
-                <button className="page-btn" onClick={() => setPage(p => p - 1)} disabled={page === 0}>
-                  ← Prev
-                </button>
+                <button className="page-btn" onClick={() => setPage(p => p - 1)} disabled={page === 0}>← Prev</button>
                 {Array.from({ length: totalPages }, (_, i) => (
-                  <button
-                    key={i}
-                    className={`page-btn${page === i ? " active" : ""}`}
-                    onClick={() => setPage(i)}
-                  >
-                    {i + 1}
-                  </button>
+                  <button key={i} className={`page-btn${page === i ? " active" : ""}`} onClick={() => setPage(i)}>{i + 1}</button>
                 ))}
-                <button className="page-btn" onClick={() => setPage(p => p + 1)} disabled={page === totalPages - 1}>
-                  Next →
-                </button>
+                <button className="page-btn" onClick={() => setPage(p => p + 1)} disabled={page === totalPages - 1}>Next →</button>
               </div>
             )}
           </div>
 
-          {/* ── Sidebar Ad ────────────────────────────────────────── */}
-          <div style={styles.sidebar}>
-            <AdBanner slot="3333333333" format="rectangle" />
-            <div style={{ marginTop: 20 }}>
-              <AdBanner slot="4444444444" format="rectangle" />
+          {/* Sidebar — hidden on mobile */}
+          {!isMobile && (
+            <div style={styles.sidebar}>
+              <AdBanner slot="3333333333" format="rectangle" />
+              <div style={{ marginTop: 20 }}>
+                <AdBanner slot="4444444444" format="rectangle" />
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* ── Bottom Ad Banner ──────────────────────────────────── */}
         <div style={{ marginTop: 40 }}>
           <AdBanner slot="5555555555" format="horizontal" />
         </div>
-
       </div>
     </div>
   );
 }
 
 const styles = {
-  container: {
-    maxWidth: 1100,
-    margin: "0 auto",
-    padding: "48px 40px 80px",
-  },
-  header: {
-    display: "flex",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    marginBottom: 32,
-    flexWrap: "wrap",
-    gap: 16,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 800,
-    letterSpacing: "-1px",
-    color: "#F0EDE6",
-    fontFamily: "'Syne'",
-    marginBottom: 6,
-  },
-  sub: {
-    fontSize: 14,
-    color: "#555",
-    fontFamily: "'DM Sans'",
-  },
-  btnPrimary: {
-    background: "#F0EDE6",
-    color: "#0D0D0F",
-    border: "none",
-    borderRadius: 10,
-    padding: "10px 22px",
-    fontSize: 13,
-    fontWeight: 700,
-    cursor: "pointer",
-    fontFamily: "'Syne'",
-    textDecoration: "none",
-    display: "inline-block",
-  },
-  mainLayout: {
-    display: "flex",
-    gap: 28,
-    alignItems: "flex-start",
-  },
-  sidebar: {
-    width: 300,
-    flexShrink: 0,
-    position: "sticky",
-    top: 100,
-  },
-  emptyBox: {
-    background: "#141416",
-    border: "1px solid #232326",
-    borderRadius: 20,
-    padding: "60px 40px",
-    textAlign: "center",
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: 700,
-    color: "#F0EDE6",
-    fontFamily: "'Syne'",
-    marginBottom: 8,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: "#555",
-    fontFamily: "'DM Sans'",
-  },
-  spinner: {
-    width: 36,
-    height: 36,
-    border: "3px solid #222",
-    borderTopColor: "#F0EDE6",
-    borderRadius: "50%",
-    animation: "spin 0.8s linear infinite",
-    margin: "0 auto 20px",
-  },
-  formatBadge: {
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-    background: "#1a1a1e",
-    border: "1px solid #2e2e33",
-    borderRadius: 8,
-    padding: "6px 12px",
-    flexShrink: 0,
-    fontFamily: "'DM Sans'",
-  },
-  filename: {
-    fontSize: 14,
-    fontWeight: 600,
-    color: "#F0EDE6",
-    fontFamily: "'DM Sans'",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-  },
-  meta: {
-    fontSize: 12,
-    color: "#555",
-    fontFamily: "'DM Sans'",
-    marginTop: 3,
-  },
-  statusBadge: {
-    fontSize: 11,
-    fontWeight: 700,
-    letterSpacing: "0.5px",
-    borderRadius: 6,
-    padding: "4px 10px",
-    fontFamily: "'DM Sans'",
-    flexShrink: 0,
-  },
-  delBtn: {
-    background: "transparent",
-    border: "1px solid #2e2e33",
-    color: "#555",
-    borderRadius: 6,
-    padding: "5px 10px",
-    cursor: "pointer",
-    fontSize: 12,
-    fontFamily: "'DM Sans'",
-    flexShrink: 0,
-    transition: "all 0.2s",
-  },
-  pagination: {
-    display: "flex",
-    gap: 8,
-    justifyContent: "center",
-    marginTop: 28,
-    flexWrap: "wrap",
-  },
+  container: { maxWidth: 1100, margin: "0 auto" },
+  header: { display: "flex", justifyContent: "space-between", marginBottom: 32, gap: 16 },
+  title: { fontWeight: 800, letterSpacing: "-1px", color: "#F0EDE6", fontFamily: "'Syne'", marginBottom: 6 },
+  sub: { fontSize: 14, color: "#555", fontFamily: "'DM Sans'" },
+  btnPrimary: { background: "#F0EDE6", color: "#0D0D0F", border: "none", borderRadius: 10, padding: "10px 22px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Syne'", textDecoration: "none", display: "inline-block", flexShrink: 0 },
+  mainLayout: { display: "flex", gap: 28, alignItems: "flex-start" },
+  sidebar: { width: 300, flexShrink: 0, position: "sticky", top: 100 },
+  emptyBox: { background: "#141416", border: "1px solid #232326", borderRadius: 20, padding: "60px 40px", textAlign: "center" },
+  emptyTitle: { fontSize: 20, fontWeight: 700, color: "#F0EDE6", fontFamily: "'Syne'", marginBottom: 8 },
+  emptyText: { fontSize: 14, color: "#555", fontFamily: "'DM Sans'" },
+  spinner: { width: 36, height: 36, border: "3px solid #222", borderTopColor: "#F0EDE6", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 20px" },
+  formatBadge: { display: "flex", alignItems: "center", gap: 6, background: "#1a1a1e", border: "1px solid #2e2e33", borderRadius: 8, padding: "6px 12px", flexShrink: 0, fontFamily: "'DM Sans'" },
+  filename: { fontSize: 14, fontWeight: 600, color: "#F0EDE6", fontFamily: "'DM Sans'", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+  meta: { fontSize: 12, color: "#555", fontFamily: "'DM Sans'", marginTop: 3 },
+  statusBadge: { fontSize: 11, fontWeight: 700, letterSpacing: "0.5px", borderRadius: 6, padding: "4px 10px", fontFamily: "'DM Sans'", flexShrink: 0 },
+  delBtn: { background: "transparent", border: "1px solid #2e2e33", color: "#555", borderRadius: 6, padding: "5px 10px", cursor: "pointer", fontSize: 12, fontFamily: "'DM Sans'", flexShrink: 0, transition: "all 0.2s" },
+  pagination: { display: "flex", gap: 8, justifyContent: "center", marginTop: 28, flexWrap: "wrap" },
 };

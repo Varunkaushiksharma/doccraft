@@ -1,10 +1,18 @@
+// src/pages/ToolsPage.jsx  — responsive version
+// Changes vs original:
+//   • padding: "60px 60px" → responsive 20px on mobile
+//   • search input: fixed 280px → 100% on mobile
+//   • h1 font-size smaller on mobile
+
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { TOOLS } from "../utils/theme";
+import { useBreakpoint } from "../hooks/useBreakpoint";
 
 export default function ToolsPage() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
+  const isMobile = useBreakpoint(768);
 
   const filtered = TOOLS.filter((t) => {
     const matchSearch = t.label.toLowerCase().includes(search.toLowerCase()) ||
@@ -14,9 +22,10 @@ export default function ToolsPage() {
   });
 
   const categories = ["all", ...new Set(TOOLS.map(t => t.category))];
+  const px = isMobile ? "20px" : "60px";
 
   return (
-    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "60px 60px 100px" }}>
+    <div style={{ maxWidth: 1200, margin: "0 auto", padding: `${isMobile ? "32px" : "60px"} ${px} 100px` }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
         .tool-card { background: #141416; border: 1px solid #232326; border-radius: 16px; padding: 26px 22px; cursor: pointer; transition: all 0.22s; text-decoration: none; display: block; }
@@ -28,7 +37,7 @@ export default function ToolsPage() {
         .cat-btn:not(.active):hover { border-color: #444; color: #F0EDE6; }
       `}</style>
 
-      <h1 style={{ fontSize: 40, fontWeight: 800, letterSpacing: "-1.5px", fontFamily: "'Syne'", color: "#F0EDE6", marginBottom: 8 }}>
+      <h1 style={{ fontSize: isMobile ? 28 : 40, fontWeight: 800, letterSpacing: "-1.5px", fontFamily: "'Syne'", color: "#F0EDE6", marginBottom: 8 }}>
         All Tools
       </h1>
       <p style={{ fontFamily: "'DM Sans'", color: "#555", marginBottom: 36 }}>
@@ -36,7 +45,7 @@ export default function ToolsPage() {
       </p>
 
       {/* SEARCH + FILTER */}
-      <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 32, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 16, alignItems: "flex-start", marginBottom: 32, flexWrap: "wrap", flexDirection: isMobile ? "column" : "row" }}>
         <input
           className="search-input"
           type="text"
@@ -44,24 +53,17 @@ export default function ToolsPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={{
-            background: "#141416",
-            border: "1px solid #232326",
-            borderRadius: 12,
-            padding: "11px 18px",
-            fontSize: 14,
-            color: "#F0EDE6",
+            background: "#141416", border: "1px solid #232326", borderRadius: 12,
+            padding: "11px 18px", fontSize: 14, color: "#F0EDE6",
             fontFamily: "'DM Sans'",
-            width: 280,
+            width: isMobile ? "100%" : 280,
             transition: "border-color 0.2s",
+            boxSizing: "border-box",
           }}
         />
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {categories.map((cat) => (
-            <button
-              key={cat}
-              className={`cat-btn${category === cat ? " active" : ""}`}
-              onClick={() => setCategory(cat)}
-            >
+            <button key={cat} className={`cat-btn${category === cat ? " active" : ""}`} onClick={() => setCategory(cat)}>
               {cat.charAt(0).toUpperCase() + cat.slice(1)}
             </button>
           ))}
@@ -73,16 +75,16 @@ export default function ToolsPage() {
           No tools found for "{search}"
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(auto-fill, minmax(150px, 1fr))" : "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
           {filtered.map((tool) => (
-            <Link key={tool.id} to={`/tool/${tool.id}`} className="tool-card">
+            <Link key={tool.id} to={`/tool/${tool.id}`} className="tool-card" style={{ position: "relative" }}>
               <div style={{ position: "absolute", top: 16, right: 16, width: 8, height: 8, borderRadius: "50%", background: tool.color, opacity: 0.8 }} />
-              <div style={{ fontSize: 28, marginBottom: 14, position: "relative" }}>
+              <div style={{ fontSize: isMobile ? 22 : 28, marginBottom: 14, position: "relative" }}>
                 {tool.icon}
                 <span style={{ fontSize: 14, margin: "0 4px", color: "#444" }}>→</span>
                 {tool.iconTo}
               </div>
-              <p style={{ fontWeight: 700, fontSize: 15, color: "#F0EDE6", fontFamily: "'Syne'", marginBottom: 6 }}>{tool.label}</p>
+              <p style={{ fontWeight: 700, fontSize: isMobile ? 13 : 15, color: "#F0EDE6", fontFamily: "'Syne'", marginBottom: 6 }}>{tool.label}</p>
               <p style={{ fontSize: 13, color: "#666", fontFamily: "'DM Sans'", lineHeight: 1.6 }}>{tool.desc}</p>
             </Link>
           ))}
