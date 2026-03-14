@@ -1,13 +1,5 @@
-// src/pages/ToolPage.jsx  — responsive version
-// Changes vs original:
-//   • twoCol: flex-direction column on mobile, sidebar hidden on mobile
-//   • container padding: 24px → 16px on mobile
-//   • card padding: 32px → 20px on mobile
-//   • title font-size smaller on mobile
-//   • header: flex-direction column on very small screens
-//   • All original logic/options untouched
-
 import { useParams, Link } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { TOOLS } from "../utils/theme";
 import { useConversion } from "../hooks/useConversion";
 import DropZone from "../components/DropZone";
@@ -17,24 +9,29 @@ import { downloadBlob } from "../services/api";
 import { useState } from "react";
 import { useBreakpoint } from "../hooks/useBreakpoint";
 
-// ── Tool-specific option panels (unchanged) ────────────────────────────────
+// ── SEO metadata per tool ──────────────────────────────────────────────────
+const TOOL_SEO = {
+  "pdf-to-word":  { title: "PDF to Word Converter – Free Online | DocCraft",  description: "Convert PDF files to editable Word (.docx) documents instantly. Free, fast, no signup required.", keywords: "pdf to word, pdf to docx, convert pdf to word online" },
+  "word-to-pdf":  { title: "Word to PDF Converter – Free Online | DocCraft",  description: "Convert Word (.docx) documents to PDF in seconds. Preserve formatting with DocCraft's free tool.",   keywords: "word to pdf, docx to pdf, convert word to pdf online" },
+  "pdf-to-jpg":   { title: "PDF to JPG Converter – Free Online | DocCraft",   description: "Extract pages from your PDF as high-quality JPG images. Free, no registration needed.",              keywords: "pdf to jpg, pdf to image, convert pdf to jpeg online" },
+  "jpg-to-pdf":   { title: "JPG to PDF Converter – Free Online | DocCraft",   description: "Combine JPG images into a single PDF file instantly. Fast and free.",                                  keywords: "jpg to pdf, image to pdf, convert jpeg to pdf online" },
+  "merge-pdf":    { title: "Merge PDF Files – Free Online | DocCraft",         description: "Combine multiple PDF files into one document in seconds. Free PDF merger, no signup.",                 keywords: "merge pdf, combine pdf, pdf merger online, join pdf files" },
+  "compress-pdf": { title: "Compress PDF – Reduce PDF Size Online | DocCraft", description: "Reduce the size of your PDF while maintaining quality. Free PDF compressor online.",                  keywords: "compress pdf, reduce pdf size, pdf compressor online" },
+  "split-pdf":    { title: "Split PDF – Extract Pages Online | DocCraft",      description: "Split a PDF into individual pages or custom page ranges. Free, no login required.",                   keywords: "split pdf, extract pdf pages, pdf splitter online" },
+  "rotate-pdf":   { title: "Rotate PDF Pages – Free Online | DocCraft",        description: "Rotate PDF pages 90° or 180° in any direction. Free online PDF rotation tool.",                       keywords: "rotate pdf, rotate pdf pages online, free pdf rotator" },
+  "protect-pdf":  { title: "Protect PDF – Add Password Online | DocCraft",     description: "Secure your PDF with a password to restrict access. Free PDF protection tool.",                       keywords: "protect pdf, password protect pdf, encrypt pdf online" },
+  "pdf-to-excel": { title: "PDF to Excel Converter – Free Online | DocCraft",  description: "Convert PDF tables to editable Excel (.xlsx) spreadsheets. Free PDF to Excel converter.",            keywords: "pdf to excel, pdf to xlsx, convert pdf to spreadsheet" },
+  "unlock-pdf":   { title: "Unlock PDF – Remove Password Online | DocCraft",   description: "Remove password protection from PDF files you own. Free online PDF unlocker.",                        keywords: "unlock pdf, remove pdf password, pdf unlocker online" },
+};
 
+// ── Tool-specific option panels (unchanged) ────────────────────────────────
 function SplitOptions({ opts, setOpts }) {
   return (
     <div style={optStyles.panel}>
       <p style={optStyles.label}>Split Mode</p>
       <div style={optStyles.toggleRow}>
         {["all-pages", "range"].map((mode) => (
-          <button
-            key={mode}
-            onClick={() => setOpts((p) => ({ ...p, mode }))}
-            style={{
-              ...optStyles.toggleBtn,
-              background: opts.mode === mode ? "#F0EDE6" : "#1a1a1e",
-              color: opts.mode === mode ? "#0D0D0F" : "#888",
-              border: opts.mode === mode ? "1px solid #F0EDE6" : "1px solid #2e2e33",
-            }}
-          >
+          <button key={mode} onClick={() => setOpts((p) => ({ ...p, mode }))} style={{ ...optStyles.toggleBtn, background: opts.mode === mode ? "#F0EDE6" : "#1a1a1e", color: opts.mode === mode ? "#0D0D0F" : "#888", border: opts.mode === mode ? "1px solid #F0EDE6" : "1px solid #2e2e33" }}>
             {mode === "all-pages" ? "✂️ Every Page" : "📐 Page Range"}
           </button>
         ))}
@@ -51,9 +48,7 @@ function SplitOptions({ opts, setOpts }) {
           </div>
         </div>
       )}
-      {opts.mode === "all-pages" && (
-        <p style={optStyles.hint}>Each page will be extracted as a separate PDF and bundled into a ZIP file.</p>
-      )}
+      {opts.mode === "all-pages" && <p style={optStyles.hint}>Each page will be extracted as a separate PDF and bundled into a ZIP file.</p>}
     </div>
   );
 }
@@ -64,9 +59,7 @@ function RotateOptions({ opts, setOpts }) {
       <p style={optStyles.label}>Rotation Angle</p>
       <div style={optStyles.toggleRow}>
         {[{ val: "90", label: "90° →" }, { val: "180", label: "180° ↩" }, { val: "270", label: "270° ←" }].map(({ val, label }) => (
-          <button key={val} onClick={() => setOpts((p) => ({ ...p, degrees: val }))} style={{ ...optStyles.toggleBtn, background: opts.degrees === val ? "#F7A94F" : "#1a1a1e", color: opts.degrees === val ? "#0D0D0F" : "#888", border: opts.degrees === val ? "1px solid #F7A94F" : "1px solid #2e2e33" }}>
-            {label}
-          </button>
+          <button key={val} onClick={() => setOpts((p) => ({ ...p, degrees: val }))} style={{ ...optStyles.toggleBtn, background: opts.degrees === val ? "#F7A94F" : "#1a1a1e", color: opts.degrees === val ? "#0D0D0F" : "#888", border: opts.degrees === val ? "1px solid #F7A94F" : "1px solid #2e2e33" }}>{label}</button>
         ))}
       </div>
       <p style={optStyles.label}>Which Pages?</p>
@@ -95,7 +88,7 @@ function ProtectOptions({ opts, setOpts }) {
         <label style={optStyles.inputLabel}>🔑 Password (required)</label>
         <div style={{ position: "relative" }}>
           <input type={showPass ? "text" : "password"} value={opts.userPassword} onChange={(e) => setOpts((p) => ({ ...p, userPassword: e.target.value }))} style={{ ...optStyles.input, paddingRight: 48 }} placeholder="Enter a strong password"/>
-          <button onClick={() => setShowPass((v) => !v)} style={optStyles.eyeBtn} title={showPass ? "Hide" : "Show"}>{showPass ? "🙈" : "👁️"}</button>
+          <button onClick={() => setShowPass((v) => !v)} style={optStyles.eyeBtn}>{showPass ? "🙈" : "👁️"}</button>
         </div>
       </div>
       <div style={optStyles.inputGroup}>
@@ -115,10 +108,10 @@ function UnlockOptions({ opts, setOpts }) {
         <label style={optStyles.inputLabel}>🔑 Current Password (if known)</label>
         <div style={{ position: "relative" }}>
           <input type={showPass ? "text" : "password"} value={opts.password} onChange={(e) => setOpts((p) => ({ ...p, password: e.target.value }))} style={{ ...optStyles.input, paddingRight: 48 }} placeholder="Leave blank to try without password"/>
-          <button onClick={() => setShowPass((v) => !v)} style={optStyles.eyeBtn} title={showPass ? "Hide" : "Show"}>{showPass ? "🙈" : "👁️"}</button>
+          <button onClick={() => setShowPass((v) => !v)} style={optStyles.eyeBtn}>{showPass ? "🙈" : "👁️"}</button>
         </div>
       </div>
-      <p style={optStyles.hint}>If the PDF has an <strong style={{ color: "#F0EDE6" }}>owner password</strong> only (not a user password), we can remove it automatically without a password.</p>
+      <p style={optStyles.hint}>If the PDF has an <strong style={{ color: "#F0EDE6" }}>owner password</strong> only, we can remove it automatically without a password.</p>
     </div>
   );
 }
@@ -131,10 +124,7 @@ const defaultOpts = {
 };
 
 function buildApiOptions(toolId, opts) {
-  if (toolId === "split-pdf") {
-    if (opts.mode === "range") return { startPage: opts.startPage, endPage: opts.endPage };
-    return {};
-  }
+  if (toolId === "split-pdf") return opts.mode === "range" ? { startPage: opts.startPage, endPage: opts.endPage } : {};
   if (toolId === "rotate-pdf") return { degrees: opts.degrees, pageTarget: opts.pageMode === "all" ? "all" : opts.pageTarget };
   if (toolId === "protect-pdf") return { userPassword: opts.userPassword, ownerPassword: opts.ownerPassword || "" };
   if (toolId === "unlock-pdf") return { password: opts.password || "" };
@@ -150,9 +140,7 @@ function validateOpts(toolId, opts) {
     if (!opts.userPassword) return "Please enter a password to protect the PDF.";
     if (opts.userPassword.length < 4) return "Password must be at least 4 characters.";
   }
-  if (toolId === "rotate-pdf" && opts.pageMode === "specific" && !opts.pageTarget.trim()) {
-    return "Please enter page numbers (e.g. 1,3,5).";
-  }
+  if (toolId === "rotate-pdf" && opts.pageMode === "specific" && !opts.pageTarget.trim()) return "Please enter page numbers (e.g. 1,3,5).";
   return null;
 }
 
@@ -161,12 +149,13 @@ export default function ToolPage() {
   const { toolId } = useParams();
   const tool = TOOLS.find((t) => t.id === toolId);
   const isMobile = useBreakpoint(768);
+  const seo = TOOL_SEO[toolId];
+  const canonical = `https://doccraft-liart.vercel.app/tool/${toolId}`;
 
   const { files, progress, status, error, resultFilename, addFiles, removeFile, reset, convert } = useConversion(tool);
   const [resultBlob, setResultBlob] = useState(null);
   const [opts, setOpts] = useState(defaultOpts[toolId] || {});
   const [optsError, setOptsError] = useState(null);
-
   const hasOptions = !!defaultOpts[toolId];
 
   const handleConvert = () => {
@@ -175,11 +164,8 @@ export default function ToolPage() {
       if (err) { setOptsError(err); return; }
       setOptsError(null);
       const apiOpts = buildApiOptions(toolId, opts);
-      if (toolId === "split-pdf" && opts.mode === "range") {
-        convert(apiOpts, "split-pdf-range");
-      } else {
-        convert(apiOpts);
-      }
+      if (toolId === "split-pdf" && opts.mode === "range") convert(apiOpts, "split-pdf-range");
+      else convert(apiOpts);
     } else {
       convert();
     }
@@ -201,6 +187,24 @@ export default function ToolPage() {
 
   return (
     <div style={styles.page}>
+      {/* ── Helmet SEO tags ── */}
+      {seo && (
+        <Helmet>
+          <title>{seo.title}</title>
+          <meta name="description" content={seo.description} />
+          <meta name="keywords" content={seo.keywords} />
+          <link rel="canonical" href={canonical} />
+          <meta property="og:title" content={seo.title} />
+          <meta property="og:description" content={seo.description} />
+          <meta property="og:url" content={canonical} />
+          <meta property="og:type" content="website" />
+          <meta property="og:image" content="https://doccraft-liart.vercel.app/og-image.png" />
+          <meta name="twitter:card" content="summary_large_image" />
+          <meta name="twitter:title" content={seo.title} />
+          <meta name="twitter:description" content={seo.description} />
+        </Helmet>
+      )}
+
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
         @keyframes spin { to { transform: rotate(360deg); } }
@@ -212,7 +216,6 @@ export default function ToolPage() {
         input::placeholder { color: #444; }
       `}</style>
 
-      {/* TOP AD */}
       <div style={{ maxWidth: 760, margin: "0 auto", padding: isMobile ? "16px 16px 0" : "24px 24px 0" }}>
         <AdBanner slot="6666666666" format="horizontal" />
       </div>
@@ -220,7 +223,6 @@ export default function ToolPage() {
       <div style={{ ...styles.container, padding: containerPad }} className="fade-up">
         <Link to="/tools" style={styles.backBtn}>← All Tools</Link>
 
-        {/* HEADER */}
         <div style={{ ...styles.header, flexDirection: isMobile ? "column" : "row", gap: isMobile ? 14 : 20 }}>
           <div style={{ ...styles.iconBox, background: tool.color + "18", border: `1px solid ${tool.color}33` }}>
             <span style={{ fontSize: 30 }}>{tool.icon}</span>
@@ -231,16 +233,13 @@ export default function ToolPage() {
           </div>
         </div>
 
-        {/* BREADCRUMB */}
         <div style={styles.breadcrumb}>
           <span style={styles.breadTag}>{tool.from}</span>
           <span style={{ color: "#444", fontSize: 18 }}>→</span>
           <span style={{ ...styles.breadTag, borderColor: tool.color + "44", color: tool.color }}>{tool.to}</span>
         </div>
 
-        {/* TWO COLUMN LAYOUT — stacks on mobile */}
         <div style={{ ...styles.twoCol, flexDirection: isMobile ? "column" : "row" }}>
-
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ ...styles.card, padding: cardPad }}>
               {status === "idle" || status === "error" ? (
@@ -257,41 +256,29 @@ export default function ToolPage() {
                   {optsError && <div style={styles.optsError}>⚠️ {optsError}</div>}
                   {files.length > 0 && status !== "error" && (
                     <button onClick={handleConvert} style={{ ...styles.convertBtn, background: tool.color === "#E85D4A" ? "#E85D4A" : "#F0EDE6", color: "#0D0D0F" }}>
-                      {toolId === "protect-pdf" ? "🔒 Protect PDF →" :
-                       toolId === "rotate-pdf"  ? "🔄 Rotate PDF →" :
-                       toolId === "split-pdf"   ? "✂️ Split PDF →" :
-                       toolId === "unlock-pdf"  ? "🔓 Unlock PDF →" :
-                       `Convert to ${tool.to} →`}
+                      {toolId === "protect-pdf" ? "🔒 Protect PDF →" : toolId === "rotate-pdf" ? "🔄 Rotate PDF →" : toolId === "split-pdf" ? "✂️ Split PDF →" : toolId === "unlock-pdf" ? "🔓 Unlock PDF →" : `Convert to ${tool.to} →`}
                     </button>
                   )}
                 </>
               ) : null}
-              <ConversionStatus
-                status={status} progress={progress} error={error} tool={tool}
-                resultFilename={resultFilename} onReset={reset}
-                onDownload={() => resultBlob && downloadBlob(resultBlob, resultFilename)}
-              />
+              <ConversionStatus status={status} progress={progress} error={error} tool={tool} resultFilename={resultFilename} onReset={reset} onDownload={() => resultBlob && downloadBlob(resultBlob, resultFilename)} />
             </div>
 
-            {/* SECURITY BADGES */}
             <div style={styles.badges}>
               {["🔒 Files deleted after 1hr", "🛡️ 128-bit SSL encryption", "🚫 Never shared with third parties"].map((b) => (
                 <span key={b} style={styles.secBadge}>{b}</span>
               ))}
             </div>
 
-            <div style={{ marginTop: 28 }}>
-              <AdBanner slot="7777777777" format="horizontal" />
-            </div>
+            <div style={{ marginTop: 28 }}><AdBanner slot="7777777777" format="horizontal" /></div>
 
-            {/* HOW TO USE */}
             <div style={styles.howTo}>
               <h3 style={styles.subHeading}>How to {tool.label}</h3>
               <div style={styles.stepsRow}>
                 {[
                   { n: "1", t: `Upload your ${tool.from}`, d: `Drag & drop or click to browse your ${tool.from} file.` },
-                  { n: "2", t: "Click Convert",            d: `We process it instantly using our high-fidelity ${tool.label} engine.` },
-                  { n: "3", t: `Download ${tool.to}`,      d: "Your converted file downloads automatically. Ready to use." },
+                  { n: "2", t: "Click Convert", d: `We process it instantly using our high-fidelity ${tool.label} engine.` },
+                  { n: "3", t: `Download ${tool.to}`, d: "Your converted file downloads automatically. Ready to use." },
                 ].map((s) => (
                   <div key={s.n} style={styles.step}>
                     <div style={{ ...styles.stepNum, background: tool.color + "22", color: tool.color }}>{s.n}</div>
@@ -302,7 +289,6 @@ export default function ToolPage() {
               </div>
             </div>
 
-            {/* RELATED TOOLS */}
             <div style={{ marginTop: 48 }}>
               <h3 style={styles.subHeading}>Related Tools</h3>
               <div style={styles.relatedGrid}>
@@ -317,20 +303,15 @@ export default function ToolPage() {
             </div>
           </div>
 
-          {/* SIDEBAR — hidden on mobile */}
           {!isMobile && (
             <div style={styles.sidebar}>
               <AdBanner slot="8888888888" format="rectangle" />
-              <div style={{ marginTop: 20 }}>
-                <AdBanner slot="9999999999" format="rectangle" />
-              </div>
+              <div style={{ marginTop: 20 }}><AdBanner slot="9999999999" format="rectangle" /></div>
             </div>
           )}
         </div>
 
-        <div style={{ marginTop: 48 }}>
-          <AdBanner slot="1010101010" format="horizontal" />
-        </div>
+        <div style={{ marginTop: 48 }}><AdBanner slot="1010101010" format="horizontal" /></div>
       </div>
     </div>
   );
