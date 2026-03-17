@@ -23,6 +23,12 @@ public class ConversionController {
 
     private final ConversionService conversionService;
 
+    // for uptimerobot so render server should never sleep
+    @GetMapping("/health")
+    public String health(){
+        return "OK";
+    }
+
     // ── POST /api/convert/pdf-to-word ─────────────────────────────────────────
     @PostMapping("/pdf-to-word")
     public ResponseEntity<Resource> pdfToWord(
