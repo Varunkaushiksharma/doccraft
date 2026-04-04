@@ -216,9 +216,9 @@ export default function ToolPage() {
         input::placeholder { color: #444; }
       `}</style>
 
-      <div style={{ maxWidth: 760, margin: "0 auto", padding: isMobile ? "16px 16px 0" : "24px 24px 0" }}>
+      {/* <div style={{ maxWidth: 760, margin: "0 auto", padding: isMobile ? "16px 16px 0" : "24px 24px 0" }}>
         <AdBanner slot="6666666666" format="horizontal" />
-      </div>
+      </div> */}
 
       <div style={{ ...styles.container, padding: containerPad }} className="fade-up">
         <Link to="/tools" style={styles.backBtn}>← All Tools</Link>
@@ -270,7 +270,7 @@ export default function ToolPage() {
               ))}
             </div>
 
-            <div style={{ marginTop: 28 }}><AdBanner slot="7777777777" format="horizontal" /></div>
+            {/* <div style={{ marginTop: 28 }}><AdBanner slot="7777777777" format="horizontal" /></div> */}
 
             <div style={styles.howTo}>
               <h3 style={styles.subHeading}>How to {tool.label}</h3>
@@ -303,15 +303,15 @@ export default function ToolPage() {
             </div>
           </div>
 
-          {!isMobile && (
+          {/* {!isMobile && (
             <div style={styles.sidebar}>
               <AdBanner slot="8888888888" format="rectangle" />
               <div style={{ marginTop: 20 }}><AdBanner slot="9999999999" format="rectangle" /></div>
             </div>
-          )}
+          )} */}
         </div>
 
-        <div style={{ marginTop: 48 }}><AdBanner slot="1010101010" format="horizontal" /></div>
+        {/* <div style={{ marginTop: 48 }}><AdBanner slot="1010101010" format="horizontal" /></div> */}
       </div>
     </div>
   );

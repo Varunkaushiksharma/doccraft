@@ -10,6 +10,8 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { TOOLS } from "../utils/theme";
 import { useBreakpoint } from "../hooks/useBreakpoint";
+import { COLORS, CATEGORIES } from "../utils/theme.js";
+// or wherever your theme.js file is located
 
 const stats = [
   ["50M+", "Files Converted"],
@@ -41,7 +43,7 @@ export default function HomePage() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
         @keyframes fadeUp { from { opacity:0; transform:translateY(24px); } to { opacity:1; transform:translateY(0); } }
-        .tool-card { background: #141416; border: 1px solid #232326; border-radius: 16px; padding: 26px 22px; cursor: pointer; transition: all 0.22s; position: relative; overflow: hidden; text-decoration: none; display: block; }
+        .tool-card { background: 141416; border: 1px solid #232326; border-radius: 16px; padding: 26px 22px; cursor: pointer; transition: all 0.22s; position: relative; overflow: hidden; text-decoration: none; display: block; }
         .tool-card:hover { border-color: #3a3a3f; transform: translateY(-3px); box-shadow: 0 16px 40px rgba(0,0,0,0.5); }
         .cat-btn { background: transparent; border: 1px solid #232326; border-radius: 100px; padding: 7px 18px; font-size: 13px; cursor: pointer; font-family: 'DM Sans'; transition: all 0.2s; }
         .cat-btn.active { background: #F0EDE6; color: #0D0D0F; border-color: #F0EDE6; }
@@ -59,6 +61,7 @@ export default function HomePage() {
         textAlign: "center",
         padding: isMobile ? "60px 20px 50px" : "110px 60px 90px",
         position: "relative",
+        background: COLORS.bg,
       }}>
         <div className="hero-glow" />
         <div className="fade-up">
@@ -67,6 +70,7 @@ export default function HomePage() {
             ...styles.heroTitle,
             fontSize: isMobile ? "clamp(32px, 8vw, 52px)" : "clamp(42px, 6vw, 78px)",
             letterSpacing: isMobile ? "-1px" : "-2px",
+            color: COLORS.text,
           }}>
             Convert documents<br />
             <span style={styles.heroGradient}>without the hassle.</span>
@@ -77,12 +81,12 @@ export default function HomePage() {
           Fast. Secure. Free. No installs.
         </p>
         <div className="fade-up-3" style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-          <button onClick={() => navigate("/tool/pdf-to-word")} style={styles.btnPrimary}>
+          <button onClick={() => navigate("/tool/pdf-to-word")} style={{...styles.btnPrimary ,border: `1px solid black` } }>
             Try PDF to Word →
           </button>
           <button
             onClick={() => document.getElementById("tools-section").scrollIntoView({ behavior: "smooth" })}
-            style={styles.btnOutline}
+            style={{ ...styles.btnOutline, color: COLORS.text }}
           >
             See all tools
           </button>
@@ -95,18 +99,18 @@ export default function HomePage() {
           marginTop: isMobile ? 48 : 72,
         }}>
           {stats.map(([v, l]) => (
-            <div key={l} style={{ textAlign: "center" }}>
+            <div key={l} style={{ textAlign: "center" , color: COLORS.text }}>
               <div style={{ ...styles.statValue, fontSize: isMobile ? 22 : 30 }}>{v}</div>
-              <div style={styles.statLabel}>{l}</div>
+              <div style={{...styles.statLabel , color: COLORS.text }}>{l}</div>
             </div>
           ))}
         </div>
       </section>
 
       {/* TOOLS */}
-      <section id="tools-section" style={{ padding: `0 ${px} 100px`, maxWidth: 1200, margin: "0 auto" }}>
+      <section id="tools-section" style={{ padding: `0 ${px} 100px`, maxWidth: 1200, margin: "0 auto", background: COLORS.bg }}>
         <div style={{ marginBottom: 36 }}>
-          <h2 style={styles.sectionTitle}>All Tools</h2>
+          <h2 style={{ ...styles.sectionTitle , color: COLORS.text }}>All Tools</h2>
           <p style={styles.sectionSub}>Everything you need to work with documents.</p>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 20 }}>
             {["all","convert","organize","optimize","edit","security"].map((cat) => (
@@ -147,9 +151,9 @@ export default function HomePage() {
       </section>
 
       {/* FEATURES */}
-      <section style={{ background: "#0a0a0c", borderTop: "1px solid #191919", padding: `80px ${px}` }}>
+      <section style={{ background: COLORS.bg, borderTop: "1px solid #191919", padding: `80px ${px}` }}>
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-          <h2 style={{ ...styles.sectionTitle, marginBottom: 8 }}>Why DocCraft?</h2>
+          <h2 style={{ ...styles.sectionTitle, marginBottom: 8 , color : COLORS.text }}>Why DocCraft?</h2>
           <p style={{ ...styles.sectionSub, marginBottom: 48 }}>Built for speed, security, and simplicity.</p>
           <div style={styles.featureGrid}>
             {features.map((f) => (
@@ -164,7 +168,7 @@ export default function HomePage() {
       </section>
 
       {/* CTA */}
-      <section style={{ padding: `80px ${px}`, textAlign: "center" }}>
+      <section style={{ padding: `80px ${px}`, textAlign: "center"  , background: COLORS.bg }}>
         <div style={{
           ...styles.ctaBox,
           padding: isMobile ? "40px 24px" : "60px 40px",

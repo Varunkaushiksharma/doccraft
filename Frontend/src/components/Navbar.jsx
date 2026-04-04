@@ -8,6 +8,7 @@ import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useBreakpoint } from "../hooks/useBreakpoint";
+import { COLORS } from "../utils/theme";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -25,15 +26,15 @@ export default function Navbar() {
   const close = () => setMenuOpen(false);
 
   return (
-    <nav style={{ ...styles.nav, padding: isMobile ? "14px 20px" : "18px 60px" }}>
+    <nav style={{ ...styles.nav, padding: isMobile ? "14px 20px" : "18px 60px" , background: COLORS.bg }}>
       <Link to="/" style={styles.logo} onClick={close}>
         <div style={styles.logoIcon}>⚡</div>
-        <span style={styles.logoText}>DocCraft</span>
+        <span style={{ ...styles.logoText, color: COLORS.text }}>DocCraft</span>
       </Link>
 
       {!isMobile && (
-        <div style={styles.links}>
-          <Link to="/tools" style={{ ...styles.link, color: location.pathname === "/tools" ? "#F0EDE6" : "#888" }}>
+        <div style={{...styles.links , color: COLORS.text }}>
+          <Link to="/tools" style={{ ...styles.link, color: location.pathname === "/tools" ? COLORS.text : "#888" }}>
             All Tools
           </Link>
         </div>

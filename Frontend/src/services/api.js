@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const BASE_URL = import.meta.env.VITE_API_URL || "https://doccraft-lu3q.onrender.com/api";
+const BASE_URL = import.meta.env.VITE_API_URL || "https://doccraft-lu3q.onrender.com/api" || "http://localhost:8080/api";
 
 const api = axios.create({
   baseURL: BASE_URL,
