@@ -80,9 +80,9 @@ export default function HistoryPage() {
 
       <div style={{ ...styles.container, padding: isMobile ? "24px 16px 60px" : "48px 40px 80px" }} className="fade-up">
 
-        <div style={{ marginBottom: 32 }}>
+        {/* <div style={{ marginBottom: 32 }}>
           <AdBanner slot="1111111111" format="horizontal" />
-        </div>
+        </div> */}
 
         <div style={{ ...styles.header, flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "flex-start" : "flex-start" }}>
           <div>
@@ -136,11 +136,11 @@ export default function HistoryPage() {
                     </div>
                   );
                 })}
-                {records.length >= 5 && (
+                {/* {records.length >= 5 && (
                   <div style={{ margin: "8px 0" }}>
                     <AdBanner slot="2222222222" format="horizontal" />
                   </div>
-                )}
+                )} */}
               </div>
             )}
 
@@ -156,19 +156,19 @@ export default function HistoryPage() {
           </div>
 
           {/* Sidebar — hidden on mobile */}
-          {!isMobile && (
+          {/* {!isMobile && (
             <div style={styles.sidebar}>
               <AdBanner slot="3333333333" format="rectangle" />
               <div style={{ marginTop: 20 }}>
                 <AdBanner slot="4444444444" format="rectangle" />
               </div>
             </div>
-          )}
+          )} */}
         </div>
 
-        <div style={{ marginTop: 40 }}>
+        {/* <div style={{ marginTop: 40 }}>
           <AdBanner slot="5555555555" format="horizontal" />
-        </div>
+        </div> */}
       </div>
     </div>
   );
