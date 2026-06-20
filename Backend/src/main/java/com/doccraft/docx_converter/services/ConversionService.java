@@ -16,9 +16,6 @@ import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.apache.pdfbox.rendering.ImageType;
 import org.apache.pdfbox.rendering.PDFRenderer;
 import org.apache.pdfbox.text.PDFTextStripper;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.poi.xwpf.usermodel.*;
 import org.springframework.beans.factory.annotation.Value;
@@ -173,11 +170,17 @@ public class ConversionService {
                     int end = Math.min(currentLine + linesPerPage, lines.size());
                     for (int i = currentLine; i < end; i++) {
                         String text = lines.get(i);
-                        if (text == null) text = "";
-                        // Sanitize — PDFBox can't handle non-WinAnsi chars
-                        text = text.replaceAll("[^\\x00-\\xFF]", "?");
+                        if (text == null) {
+                            text = "";
+                        }
+                        // Remove unsupported PDFBox characters
+                        text = text
+                                .replace("\t", "    ")   // tab -> spaces
+                                .replace("\r", "")
+                                .replace("\n", "")
+                                .replaceAll("[^\\x20-\\x7E]", "?");
+
                         cs.showText(text);
-                        cs.newLine();
                     }
                     cs.endText();
                     currentLine = end;
