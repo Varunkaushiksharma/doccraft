@@ -137,8 +137,35 @@ public class ConversionService {
             );
             pb.redirectErrorStream(true);
             Process p = pb.start();
+
+            // Drain the process output; some LibreOffice/soffice builds block on a full
+            // stdout/stderr pipe if it isn't consumed, which can hang the conversion.
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+                while (reader.readLine() != null) {
+                    // discarded — redirectErrorStream(true) merges stderr into this stream
+                }
+            }
+
             int exitCode = p.waitFor();
             if (exitCode != 0) throw new IOException("LibreOffice exited with code: " + exitCode);
+
+            // LibreOffice names its output after the INPUT file's base name, not after
+            // the `output` Path we were given (e.g. input "abc123_resume.docx" ->
+            // output "abc123_resume.pdf" in outputDir). Find that file and move/rename
+            // it to the actual `output` path the rest of the app expects.
+            String inputBaseName = input.getFileName().toString();
+            int dotIdx = inputBaseName.lastIndexOf('.');
+            String inputStem = (dotIdx > 0) ? inputBaseName.substring(0, dotIdx) : inputBaseName;
+            Path libreOfficeOutput = Paths.get(outputDir, inputStem + ".pdf");
+
+            if (!Files.exists(libreOfficeOutput)) {
+                throw new IOException(
+                    "LibreOffice reported success but expected output file not found: " + libreOfficeOutput
+                );
+            }
+
+            Files.move(libreOfficeOutput, output, StandardCopyOption.REPLACE_EXISTING);
+
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IOException("LibreOffice conversion was interrupted");
