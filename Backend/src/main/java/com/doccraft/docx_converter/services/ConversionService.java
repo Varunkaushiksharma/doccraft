@@ -117,10 +117,13 @@ public class ConversionService {
     }
 
     private boolean isLibreOfficeAvailable() {
-        try {
+     try {
             Process p = Runtime.getRuntime().exec(new String[]{"libreoffice", "--version"});
-            return p.waitFor() == 0;
+            boolean ok = p.waitFor() == 0;
+            log.info("LibreOffice available: {}", ok);
+            return ok;
         } catch (Exception e) {
+            log.warn("LibreOffice check failed: {}", e.getMessage());
             return false;
         }
     }
