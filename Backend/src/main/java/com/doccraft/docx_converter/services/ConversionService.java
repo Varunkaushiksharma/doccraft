@@ -97,7 +97,7 @@ public class ConversionService {
 
     // ── DOCX → PDF ───────────────────────────────────────────────────────────
     // Strategy 1: LibreOffice headless (best quality — install LibreOffice on server)
-    // Strategy 2: Fallback — extract text from DOCX and write to PDF via PDFBox
+    // Strategy 2: Fallback — extract text from DOCX (incl. tables) and write to PDF via PDFBox
     public Path convertDocxToPdf(MultipartFile file, User user, String ip) throws IOException {
         ensureDirs();
         Path inputPath = saveUpload(file);
@@ -117,7 +117,7 @@ public class ConversionService {
     }
 
     private boolean isLibreOfficeAvailable() {
-     try {
+        try {
             Process p = Runtime.getRuntime().exec(new String[]{"libreoffice", "--version"});
             boolean ok = p.waitFor() == 0;
             log.info("LibreOffice available: {}", ok);
@@ -145,15 +145,16 @@ public class ConversionService {
         }
     }
 
+    // ── FIXED fallback: walks paragraphs AND tables (recursively), instead of
+    // docx.getParagraphs() which silently skips anything inside a table.
+    // This was the actual cause of "only 2 lines come through" — resume content
+    // laid out in tables (project rows, education rows) was never being read.
     private void convertDocxToPdfFallback(Path inputPath, Path outputPath) throws IOException {
-        // Extract text from DOCX, write to PDF
         try (XWPFDocument docx = new XWPFDocument(new FileInputStream(inputPath.toFile()));
              PDDocument pdf = new PDDocument()) {
 
             List<String> lines = new ArrayList<>();
-            for (XWPFParagraph para : docx.getParagraphs()) {
-                lines.add(para.getText());
-            }
+            collectBodyText(docx.getBodyElements(), lines);
 
             // Write lines to PDF pages
             int linesPerPage = 45;
@@ -176,14 +177,17 @@ public class ConversionService {
                         if (text == null) {
                             text = "";
                         }
-                        // Remove unsupported PDFBox characters
                         text = text
-                                .replace("\t", "    ")   // tab -> spaces
+                                .replace("\t", "    ")
                                 .replace("\r", "")
                                 .replace("\n", "")
                                 .replaceAll("[^\\x20-\\x7E]", "?");
 
-                        cs.showText(text);
+                        // Hard-wrap long lines so PDFBox doesn't clip/choke on wide table/bullet text
+                        for (String wrapped : wrapLine(text, 95)) {
+                            cs.showText(wrapped);
+                            cs.newLine();
+                        }
                     }
                     cs.endText();
                     currentLine = end;
@@ -195,6 +199,47 @@ public class ConversionService {
         }
     }
 
+    // Recursively collects text from body elements: paragraphs AND tables
+    // (table cells can themselves contain paragraphs or nested tables).
+    private void collectBodyText(List<IBodyElement> elements, List<String> lines) {
+        for (IBodyElement el : elements) {
+            if (el instanceof XWPFParagraph para) {
+                String text = para.getText();
+                if (text != null && !text.isBlank()) {
+                    String prefix = (para.getNumFmt() != null && !para.getNumFmt().isEmpty()) ? "- " : "";
+                    lines.add(prefix + text);
+                } else {
+                    lines.add(""); // preserve blank-line spacing
+                }
+            } else if (el instanceof XWPFTable table) {
+                for (XWPFTableRow row : table.getRows()) {
+                    for (XWPFTableCell cell : row.getTableCells()) {
+                        collectBodyText(cell.getBodyElements(), lines);
+                    }
+                }
+                lines.add(""); // spacing after a table block
+            }
+            // Other body element types (SDTs etc.) are rare in resumes; skip safely.
+        }
+    }
+
+    // Hard-wraps a line at ~maxChars without breaking words where possible.
+    private List<String> wrapLine(String text, int maxChars) {
+        List<String> out = new ArrayList<>();
+        if (text.isEmpty()) {
+            out.add("");
+            return out;
+        }
+        while (text.length() > maxChars) {
+            int breakAt = text.lastIndexOf(' ', maxChars);
+            if (breakAt <= 0) breakAt = maxChars;
+            out.add(text.substring(0, breakAt));
+            text = text.substring(breakAt).stripLeading();
+        }
+        out.add(text);
+        return out;
+    }
+
     // ── PDF → JPG ────────────────────────────────────────────────────────────
     public Path convertPdfToJpg(MultipartFile file, User user, String ip) throws IOException {
         ensureDirs();
@@ -204,7 +249,6 @@ public class ConversionService {
 
         try (PDDocument pdf = Loader.loadPDF(inputPath.toFile())) {
             PDFRenderer renderer = new PDFRenderer(pdf);
-            // Render first page at 150 DPI
             BufferedImage image = renderer.renderImageWithDPI(0, 150, ImageType.RGB);
             ImageIO.write(image, "JPEG", outputPath.toFile());
         }
@@ -271,7 +315,6 @@ public class ConversionService {
         Path outputPath = Paths.get(outputDir, outFilename);
 
         try (PDDocument pdf = Loader.loadPDF(inputPath.toFile())) {
-            // PDFBox will re-serialize and apply basic compression
             pdf.save(outputPath.toFile());
         }
 
@@ -328,29 +371,28 @@ public class ConversionService {
             }
         }
     }
-     // ── Split PDF ─────────────────────────────────────────────────────────────
-    // Splits each page into a separate PDF, zips them all, returns the zip.
-    // Frontend can also pass startPage/endPage for range-based split (see overload below).
+
+    // ── Split PDF ─────────────────────────────────────────────────────────────
     public Path splitPdf(MultipartFile file, User user, String ip) throws IOException {
         ensureDirs();
         Path inputPath = saveUpload(file);
         String outFilename = UUID.randomUUID() + "_split.zip";
         Path outputPath = Paths.get(outputDir, outFilename);
- 
+
         try (PDDocument pdf = Loader.loadPDF(inputPath.toFile());
              FileOutputStream fos = new FileOutputStream(outputPath.toFile());
              ZipOutputStream zos = new ZipOutputStream(fos)) {
- 
+
             int totalPages = pdf.getNumberOfPages();
             log.info("Splitting PDF with {} pages", totalPages);
- 
+
             for (int i = 0; i < totalPages; i++) {
                 try (PDDocument singlePage = new PDDocument()) {
                     singlePage.addPage(pdf.getPage(i));
- 
+
                     ByteArrayOutputStream baos = new ByteArrayOutputStream();
                     singlePage.save(baos);
- 
+
                     ZipEntry entry = new ZipEntry("page_" + (i + 1) + ".pdf");
                     zos.putNextEntry(entry);
                     zos.write(baos.toByteArray());
@@ -358,75 +400,68 @@ public class ConversionService {
                 }
             }
         }
- 
+
         saveRecord(file, outFilename, "PDF", "ZIP", "split-pdf", outputPath, user, ip, ConversionRecord.Status.SUCCESS);
         return outputPath;
     }
- 
+
     // ── Split PDF by Range ────────────────────────────────────────────────────
-    // e.g. startPage=1, endPage=3 → returns a single PDF with only those pages
     public Path splitPdfByRange(MultipartFile file, int startPage, int endPage, User user, String ip) throws IOException {
         ensureDirs();
         Path inputPath = saveUpload(file);
         String outFilename = UUID.randomUUID() + "_split.pdf";
         Path outputPath = Paths.get(outputDir, outFilename);
- 
+
         try (PDDocument pdf = Loader.loadPDF(inputPath.toFile());
              PDDocument result = new PDDocument()) {
- 
+
             int totalPages = pdf.getNumberOfPages();
- 
-            // Clamp to valid range (pages are 1-indexed from user, 0-indexed in PDFBox)
+
             int start = Math.max(1, startPage);
             int end   = Math.min(endPage, totalPages);
- 
+
             if (start > end) {
                 throw new IllegalArgumentException(
                     "Invalid page range: startPage=" + startPage + " endPage=" + endPage +
                     " (document has " + totalPages + " pages)"
                 );
             }
- 
+
             log.info("Splitting PDF pages {} to {} (total pages: {})", start, end, totalPages);
- 
+
             for (int i = start - 1; i < end; i++) {
                 result.addPage(pdf.getPage(i));
             }
- 
+
             result.save(outputPath.toFile());
         }
- 
+
         saveRecord(file, outFilename, "PDF", "PDF", "split-pdf", outputPath, user, ip, ConversionRecord.Status.SUCCESS);
         return outputPath;
     }
- 
+
     // ── Rotate PDF Pages ──────────────────────────────────────────────────────
-    // degrees: 90, 180, 270
-    // pageTarget: "all" → rotate every page; "1,3,5" → rotate specific pages (1-indexed)
     public Path rotatePdf(MultipartFile file, int degrees, String pageTarget, User user, String ip) throws IOException {
         ensureDirs();
         Path inputPath = saveUpload(file);
         String outFilename = UUID.randomUUID() + "_rotated.pdf";
         Path outputPath = Paths.get(outputDir, outFilename);
- 
-        // Normalise degrees to 0/90/180/270
+
         int normalised = ((degrees % 360) + 360) % 360;
         if (normalised != 90 && normalised != 180 && normalised != 270) {
             throw new IllegalArgumentException("Rotation must be 90, 180, or 270 degrees. Got: " + degrees);
         }
- 
+
         try (PDDocument pdf = Loader.loadPDF(inputPath.toFile())) {
             int totalPages = pdf.getNumberOfPages();
- 
+
             if ("all".equalsIgnoreCase(pageTarget) || pageTarget == null || pageTarget.isBlank()) {
-                // Rotate all pages
                 log.info("Rotating all {} pages by {} degrees", totalPages, normalised);
                 for (int i = 0; i < totalPages; i++) {
                     PDPage page = pdf.getPage(i);
                     page.setRotation((page.getRotation() + normalised) % 360);
                 }
             } else {
-                // Rotate specific pages e.g. "1,3,5"
                 String[] parts = pageTarget.split(",");
                 log.info("Rotating specific pages [{}] by {} degrees", pageTarget, normalised);
                 for (String part : parts) {
@@ -435,96 +470,86 @@ public class ConversionService {
                         log.warn("Page {} out of range (document has {} pages), skipping", pageNum, totalPages);
                         continue;
                     }
-                    PDPage page = pdf.getPage(pageNum - 1); // Convert to 0-indexed
+                    PDPage page = pdf.getPage(pageNum - 1);
                     page.setRotation((page.getRotation() + normalised) % 360);
                 }
             }
- 
+
             pdf.save(outputPath.toFile());
         }
- 
+
         saveRecord(file, outFilename, "PDF", "PDF", "rotate-pdf", outputPath, user, ip, ConversionRecord.Status.SUCCESS);
         return outputPath;
     }
- 
+
     // ── Password Protect PDF ──────────────────────────────────────────────────
-    // userPassword   → password required to OPEN the document
-    // ownerPassword  → password required to change permissions (use strong value)
-    // If ownerPassword is blank, defaults to a random UUID (user can't change permissions without it)
     public Path passwordProtectPdf(MultipartFile file, String userPassword, String ownerPassword, User user, String ip) throws IOException {
         ensureDirs();
         Path inputPath = saveUpload(file);
         String outFilename = UUID.randomUUID() + "_protected.pdf";
         Path outputPath = Paths.get(outputDir, outFilename);
- 
+
         if (userPassword == null || userPassword.isBlank()) {
             throw new IllegalArgumentException("User password must not be empty");
         }
- 
-        // Use random owner password if not provided — prevents users from easily removing protection
+
         String ownerPass = (ownerPassword == null || ownerPassword.isBlank())
                 ? UUID.randomUUID().toString()
                 : ownerPassword;
- 
+
         try (PDDocument pdf = Loader.loadPDF(inputPath.toFile())) {
-            // Define what the user (with userPassword) is allowed to do
             AccessPermission ap = new AccessPermission();
-            ap.setCanPrint(true);                // Allow printing
-            ap.setCanExtractContent(false);      // Disallow text extraction
-            ap.setCanModify(false);              // Disallow editing
-            ap.setCanFillInForm(true);           // Allow form filling
- 
+            ap.setCanPrint(true);
+            ap.setCanExtractContent(false);
+            ap.setCanModify(false);
+            ap.setCanFillInForm(true);
+
             StandardProtectionPolicy policy = new StandardProtectionPolicy(ownerPass, userPassword, ap);
-            policy.setEncryptionKeyLength(128);  // AES-128 (compatible + secure)
- 
+            policy.setEncryptionKeyLength(128);
+
             pdf.protect(policy);
             pdf.save(outputPath.toFile());
- 
+
             log.info("Password protected PDF saved: {}", outFilename);
         }
- 
+
         saveRecord(file, outFilename, "PDF", "PDF", "protect-pdf", outputPath, user, ip, ConversionRecord.Status.SUCCESS);
         return outputPath;
     }
 
-     // ── PDF → Excel ───────────────────────────────────────────────────────────
-    // Extracts text from each page, splits by whitespace into cells,
-    // and writes each page as a separate sheet in the workbook.
+    // ── PDF → Excel ───────────────────────────────────────────────────────────
     public Path convertPdfToExcel(MultipartFile file, User user, String ip) throws IOException {
         ensureDirs();
         Path inputPath = saveUpload(file);
         String outFilename = UUID.randomUUID() + ".xlsx";
         Path outputPath = Paths.get(outputDir, outFilename);
- 
+
         try (PDDocument pdf = Loader.loadPDF(inputPath.toFile());
              Workbook workbook = new XSSFWorkbook()) {
- 
+
             PDFTextStripper stripper = new PDFTextStripper();
             int totalPages = pdf.getNumberOfPages();
             log.info("Converting PDF with {} pages to Excel", totalPages);
- 
+
             for (int i = 1; i <= totalPages; i++) {
                 stripper.setStartPage(i);
                 stripper.setEndPage(i);
                 String pageText = stripper.getText(pdf);
- 
-                // Create a sheet per page
+
                 Sheet sheet = workbook.createSheet("Page " + i);
- 
+
                 String[] lines = pageText.split("\n");
                 for (int rowIdx = 0; rowIdx < lines.length; rowIdx++) {
                     String line = lines[rowIdx].trim();
                     if (line.isEmpty()) continue;
- 
+
                     Row row = sheet.createRow(rowIdx);
- 
-                    // Split line by 2+ spaces or tabs — common PDF table delimiter
+
                     String[] cells = line.split("\\s{2,}|\t");
                     for (int colIdx = 0; colIdx < cells.length; colIdx++) {
                         Cell cell = row.createCell(colIdx);
                         String val = cells[colIdx].trim();
- 
-                        // Try to parse as number for proper Excel formatting
+
                         try {
                             double num = Double.parseDouble(val.replaceAll(",", ""));
                             cell.setCellValue(num);
@@ -533,62 +558,56 @@ public class ConversionService {
                         }
                     }
                 }
- 
-                // Auto-size first 10 columns for readability
+
                 for (int col = 0; col < 10; col++) {
                     sheet.autoSizeColumn(col);
                 }
             }
- 
+
             try (FileOutputStream fos = new FileOutputStream(outputPath.toFile())) {
                 workbook.write(fos);
             }
         }
- 
+
         saveRecord(file, outFilename, "PDF", "XLSX", "pdf-to-excel", outputPath, user, ip, ConversionRecord.Status.SUCCESS);
         return outputPath;
     }
- 
+
     // ── Unlock PDF ────────────────────────────────────────────────────────────
-    // Removes password protection from a PDF.
-    // Requires the correct password to open the document first.
-    // If no password provided, tries empty string (some PDFs have empty owner password).
     public Path unlockPdf(MultipartFile file, String password, User user, String ip) throws IOException {
         ensureDirs();
         Path inputPath = saveUpload(file);
         String outFilename = UUID.randomUUID() + "_unlocked.pdf";
         Path outputPath = Paths.get(outputDir, outFilename);
- 
-        // Try with provided password, then empty string as fallback
+
         PDDocument pdf = null;
         try {
             String pass = (password != null) ? password : "";
             try {
                 pdf = Loader.loadPDF(inputPath.toFile(), pass);
             } catch (org.apache.pdfbox.pdmodel.encryption.InvalidPasswordException e) {
-                // If provided password fails, try empty password
                 if (!pass.isEmpty()) {
                     pdf = Loader.loadPDF(inputPath.toFile(), "");
                 } else {
                     throw new IllegalArgumentException("Incorrect password. Please provide the correct PDF password.");
                 }
             }
- 
+
             if (pdf.isEncrypted()) {
                 pdf.setAllSecurityToBeRemoved(true);
             }
- 
+
             pdf.save(outputPath.toFile());
             log.info("PDF unlocked successfully: {}", outFilename);
- 
+
         } finally {
             if (pdf != null) {
                 try { pdf.close(); } catch (IOException ignored) {}
             }
         }
- 
+
         saveRecord(file, outFilename, "PDF", "PDF", "unlock-pdf", outputPath, user, ip, ConversionRecord.Status.SUCCESS);
         return outputPath;
     }
- 
+
 }
